@@ -1,140 +1,72 @@
 #include <Arduino.h>
-
 #include <WiFi.h>
+#include <HTTPClient.h> // <-- Thư viện giúp ESP32 "lướt web"
 
-#include <WebServer.h>
+const char* ssid = "Tang 2";     // <--- SỬA LẠI WIFI
+const char* password = "123456789";    // <--- SỬA LẠI PASS
 
+// Địa chỉ trang web chúng ta muốn đọc (Giống như nhập địa chỉ vào Chrome)
+const char* serverName = "http://jsonplaceholder.typicode.com/todos/1";
 
-
-const char* ssid = "Tang 2";
-
-const char* password = "123456789";
-
-
-
-const int ledPin = 2; // GPIO2, typically the built-in LED on ESP32 boards
-
-
-
-WebServer server(80);
-
-
-
-void handleRoot() {
-  // Dùng R"rawliteral(...)rawliteral" để viết HTML thoải mái không cần nối chuỗi
-  String html = R"rawliteral(
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta name="viewport" content="width=device-width, initial-scale=1">
-      <style>
-        /* Đây là phần CSS - Trang trí */
-        body { font-family: Arial, sans-serif; text-align: center; margin-top: 50px; background-color: #f0f0f0; }
-        h1 { color: #333; }
-        .button {
-          display: inline-block;
-          padding: 15px 35px;
-          font-size: 24px;
-          cursor: pointer;
-          text-align: center;
-          text-decoration: none;
-          outline: none;
-          color: #fff;
-          border: none;
-          border-radius: 15px;
-          box-shadow: 0 5px #999;
-          margin: 10px;
-        }
-        .button:active {
-          background-color: #3e8e41;
-          box-shadow: 0 2px #666;
-          transform: translateY(4px);
-        }
-        .btn-on { background-color: #4CAF50; } /* Màu xanh lá */
-        .btn-off { background-color: #f44336; } /* Màu đỏ */
-      </style>
-    </head>
-    <body>
-      <h1>ĐIỀU KHIỂN ĐÈN</h1>
-      <p>Trạng thái hiện tại: Đang chờ lệnh...</p>
-      
-      <a href="/H" class="button btn-on">BẬT ĐÈN</a>
-      <a href="/L" class="button btn-off">TẮT ĐÈN</a>
-    </body>
-    </html>
-  )rawliteral";
-
-  server.send(200, "text/html", html);
-}
-
-
-
-void handleLEDOn() {
-
-  digitalWrite(ledPin, HIGH);
-
-  server.send(200, "text/plain", "LED is ON");
-
-}
-
-
-
-void handleLEDOff() {
-
-  digitalWrite(ledPin, LOW);
-
-  server.send(200, "text/plain", "LED is OFF");
-
-}
-
-
+// Thời gian chờ giữa các lần đọc (5 giây)
+unsigned long lastTime = 0;
+unsigned long timerDelay = 5000;
 
 void setup() {
-
   Serial.begin(115200);
 
-  pinMode(ledPin, OUTPUT);
-
-  digitalWrite(ledPin, LOW); // Ensure LED is off initially
-
-
-
+  // 1. Kết nối Wifi
   WiFi.begin(ssid, password);
-
-  while (WiFi.status() != WL_CONNECTED) {
-
-    delay(1000);
-
-    Serial.println("Connecting to WiFi...");
-
+  Serial.println("Dang ket noi Wifi...");
+  while(WiFi.status() != WL_CONNECTED) {
+    delay(500);
+    Serial.print(".");
   }
-
-  Serial.println("Connected to WiFi");
-
-  Serial.print("IP Address: ");
-
-  Serial.println(WiFi.localIP());
-
-
-
-  server.on("/", handleRoot);
-
-  server.on("/H", handleLEDOn);
-
-  server.on("/L", handleLEDOff);
-
-
-
-  server.begin();
-
-  Serial.println("HTTP server started");
-
+  Serial.println("\nDa ket noi Wifi thanh cong!");
+  Serial.println("Bat dau doc du lieu tu web...");
 }
 
-
-
 void loop() {
+  // Cứ sau 5 giây (5000ms) thì chạy đoạn này một lần
+  if ((millis() - lastTime) > timerDelay) {
+    
+    // Kiểm tra xem Wifi còn sống không
+    if(WiFi.status() == WL_CONNECTED) {
+      
+      HTTPClient http; // Khởi tạo "người đưa thư"
 
-  server.handleClient();
+      // Bước 1: Nhập địa chỉ web
+      http.begin(serverName); 
+      
+      // Bước 2: Gửi yêu cầu "GET" (Giống như bấm Enter trên trình duyệt)
+      Serial.println("\nDang goi den Server...");
+      int httpResponseCode = http.GET(); 
 
+      // Bước 3: Kiểm tra xem Server có trả lời không
+      if (httpResponseCode > 0) {
+        // Mã 200 nghĩa là OK (Thành công)
+        Serial.print("Server tra loi ma so: ");
+        Serial.println(httpResponseCode);
+        
+        // Bước 4: Đọc nội dung Server gửi về
+        String payload = http.getString(); 
+        Serial.println("--- NOI DUNG NHAN DUOC ---");
+        Serial.println(payload); // <-- Đây là cái chúng ta cần!
+        Serial.println("--------------------------");
+      }
+      else {
+        Serial.print("Loi roi, ma loi: ");
+        Serial.println(httpResponseCode);
+      }
+      
+      // Bước 5: Cúp máy (Giải phóng tài nguyên)
+      http.end();
+    }
+    else {
+      Serial.println("Mat ket noi Wifi!");
+    }
+    
+    // Đặt lại đồng hồ đếm giờ
+    lastTime = millis();
+  }
 }
