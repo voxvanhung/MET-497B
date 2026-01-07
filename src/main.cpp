@@ -1,72 +1,75 @@
 #include <Arduino.h>
 #include <WiFi.h>
-#include <HTTPClient.h> // <-- Thư viện giúp ESP32 "lướt web"
+#include <HTTPClient.h>
+#include <WiFiClientSecure.h> // <--- Thêm thư viện bảo mật này
+const char* ssid = "Tang 2";     // <--- 1. SỬA WIFI
+const char* password = "123456789";    // <--- 2. SỬA PASS
 
-const char* ssid = "Tang 2";     // <--- SỬA LẠI WIFI
-const char* password = "123456789";    // <--- SỬA LẠI PASS
+// <--- 3. DÁN LINK GOOGLE SCRIPT CỦA BẠN VÀO GIỮA 2 DẤU NGOẶC KÉP DƯỚI ĐÂY:
+String serverName = "https://script.google.com/macros/s/AKfycbzO_nDiiTH8Mg4bFWC5RLFpANdx708knElh46bsTN5vTM_1C2SsHsWUS9SQHGmCNEJj/exec";
 
-// Địa chỉ trang web chúng ta muốn đọc (Giống như nhập địa chỉ vào Chrome)
-const char* serverName = "http://jsonplaceholder.typicode.com/todos/1";
+// Chân đèn LED (Thường là chân 2 trên ESP32)
+const int ledPin = 2; 
 
-// Thời gian chờ giữa các lần đọc (5 giây)
 unsigned long lastTime = 0;
-unsigned long timerDelay = 5000;
+unsigned long timerDelay = 5000; // Kiểm tra 5 giây 1 lần
 
 void setup() {
   Serial.begin(115200);
+  pinMode(ledPin, OUTPUT);
 
-  // 1. Kết nối Wifi
   WiFi.begin(ssid, password);
-  Serial.println("Dang ket noi Wifi...");
+  Serial.println("Dang ket noi Wifi");
   while(WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\nDa ket noi Wifi thanh cong!");
-  Serial.println("Bat dau doc du lieu tu web...");
+  Serial.println("\nDa ket noi Wifi xong!");
 }
 
 void loop() {
-  // Cứ sau 5 giây (5000ms) thì chạy đoạn này một lần
+  // Cứ sau 5 giây thì chạy kiểm tra 1 lần
   if ((millis() - lastTime) > timerDelay) {
     
-    // Kiểm tra xem Wifi còn sống không
     if(WiFi.status() == WL_CONNECTED) {
       
-      HTTPClient http; // Khởi tạo "người đưa thư"
+      // 1. Tạo một "Anh bảo vệ" riêng chuyên lo việc HTTPS
+      WiFiClientSecure client;
+      client.setInsecure(); // Ra lệnh cho anh này: "Cứ cho qua, không cần kiểm tra chứng chỉ"
 
-      // Bước 1: Nhập địa chỉ web
-      http.begin(serverName); 
+      HTTPClient http;
+
+      // 2. Dùng anh bảo vệ này để kết nối
+      // (Lưu ý: Phải truyền biến 'client' vào hàm begin)
+      http.begin(client, serverName); 
       
-      // Bước 2: Gửi yêu cầu "GET" (Giống như bấm Enter trên trình duyệt)
-      Serial.println("\nDang goi den Server...");
-      int httpResponseCode = http.GET(); 
-
-      // Bước 3: Kiểm tra xem Server có trả lời không
+      // --- (Bỏ dòng http.setInsecure() cũ đi) ---
+      
+      http.setFollowRedirects(HTTPC_FORCE_FOLLOW_REDIRECTS);
+      
+      int httpResponseCode = http.GET();
+      
+      // ... (Phần còn lại giữ nguyên như cũ) ...
       if (httpResponseCode > 0) {
-        // Mã 200 nghĩa là OK (Thành công)
-        Serial.print("Server tra loi ma so: ");
-        Serial.println(httpResponseCode);
+        String payload = http.getString();
+        Serial.println("\n--- DU LIEU TU GOOGLE ---");
+        Serial.println(payload);
         
-        // Bước 4: Đọc nội dung Server gửi về
-        String payload = http.getString(); 
-        Serial.println("--- NOI DUNG NHAN DUOC ---");
-        Serial.println(payload); // <-- Đây là cái chúng ta cần!
-        Serial.println("--------------------------");
+        if (payload.indexOf("\"bank_money\":1") > 0) {
+          digitalWrite(ledPin, HIGH);
+          Serial.println("=> CO TIEN -> BAT DEN");
+        }
+        else {
+          digitalWrite(ledPin, LOW);
+          Serial.println("=> KHONG CO TIEN -> TAT DEN");
+        }
       }
       else {
-        Serial.print("Loi roi, ma loi: ");
+        Serial.print("Loi ket noi: ");
         Serial.println(httpResponseCode);
       }
-      
-      // Bước 5: Cúp máy (Giải phóng tài nguyên)
       http.end();
     }
-    else {
-      Serial.println("Mat ket noi Wifi!");
-    }
-    
-    // Đặt lại đồng hồ đếm giờ
     lastTime = millis();
   }
 }
