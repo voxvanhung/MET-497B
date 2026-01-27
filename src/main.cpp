@@ -2,8 +2,8 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <WiFiClientSecure.h> // <--- Thêm thư viện bảo mật này
-const char* ssid = "Tang 2";     // <--- 1. SỬA WIFI
-const char* password = "123456789";    // <--- 2. SỬA PASS
+const char* ssid = "DTU";     // <--- 1. SỬA WIFI
+const char* password = "";    // <--- 2. SỬA PASS
 
 // <--- 3. DÁN LINK GOOGLE SCRIPT CỦA BẠN VÀO GIỮA 2 DẤU NGOẶC KÉP DƯỚI ĐÂY:
 String serverName = "https://script.google.com/macros/s/AKfycbzO_nDiiTH8Mg4bFWC5RLFpANdx708knElh46bsTN5vTM_1C2SsHsWUS9SQHGmCNEJj/exec";
